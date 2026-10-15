@@ -1,0 +1,86 @@
+# Render Blueprint for PDFCraft
+# Deployed as a Static Site: free, served from Render's CDN, never spins down.
+# (Free Web Services sleep after 15 min of inactivity; Static Sites don't.)
+
+services:
+  - type: web
+    name: pdfcraft
+    runtime: static
+    plan: free
+    # postbuild (decompress + chunk >24MB files) runs automatically after `npm run build`.
+    # The .gz copies of LibreOffice WASM are only used by nginx gzip_static, so drop them.
+    buildCommand: npm ci && npm run build && rm -f out/libreoffice-wasm/*.gz
+    staticPublishPath: ./out
+    pullRequestPreviewsEnabled: false
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      # Lint and type checks run locally; skipping them saves time and memory on the build box
+      - key: SKIP_BUILD_CHECKS
+        value: "true"
+      # Fewer static generation workers = lower peak memory for the 2300+ pages
+      - key: NEXT_BUILD_CPUS
+        value: "2"
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=2048
+      - key: DISABLE_UPDATE_CHECK
+        value: "true"
+    headers:
+      # Security + cross-origin isolation (SharedArrayBuffer for LibreOffice WASM)
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: SAMEORIGIN
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: camera=(), microphone=(), geolocation=()
+      - path: /*
+        name: Cross-Origin-Opener-Policy
+        value: same-origin
+      - path: /*
+        name: Cross-Origin-Embedder-Policy
+        value: require-corp
+      - path: /*
+        name: Cross-Origin-Resource-Policy
+        value: cross-origin
+      # Long-term cache for content-hashed / versioned assets
+      - path: /_next/static/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /libreoffice-wasm/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /pdfjs-viewer/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /pdfjs-annotation-viewer/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /fonts/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      # Not content-hashed: must revalidate after each deploy
+      - path: /workers/*
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
+      - path: /pymupdf-wasm/*
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
+      - path: /sw.js
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
+    routes:
+      # Locale-prefixed asset fallback (mirrors nginx.conf): /en/workers/* → /workers/*
+      - type: rewrite
+        source: /:locale/workers/*
+        destination: /workers/*
+      - type: rewrite
+        source: /:locale/pymupdf-wasm/*
+        destination: /pymupdf-wasm/*

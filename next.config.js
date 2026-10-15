@@ -123,15 +123,22 @@ const nextConfig = {
 
   // TypeScript configuration
   typescript: {
-    // Allow production builds even with type errors during development
-    ignoreBuildErrors: false,
+    // SKIP_BUILD_CHECKS=true skips type checking on constrained CI (e.g. Render free tier)
+    ignoreBuildErrors: process.env.SKIP_BUILD_CHECKS === 'true',
   },
 
   // ESLint configuration
   eslint: {
-    // Run ESLint during builds
-    ignoreDuringBuilds: false,
+    // SKIP_BUILD_CHECKS=true skips linting on constrained CI (e.g. Render free tier)
+    ignoreDuringBuilds: process.env.SKIP_BUILD_CHECKS === 'true',
   },
+
+  // Limit static generation workers to reduce peak memory (NEXT_BUILD_CPUS=1|2|...)
+  ...(process.env.NEXT_BUILD_CPUS && {
+    experimental: {
+      cpus: Number(process.env.NEXT_BUILD_CPUS),
+    },
+  }),
 
   // Compiler options for performance
   compiler: {
