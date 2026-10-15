@@ -6,7 +6,6 @@ services:
   - type: web
     name: pdfcraft
     runtime: static
-    plan: free
     # postbuild (decompress + chunk >24MB files) runs automatically after `npm run build`.
     # The .gz copies of LibreOffice WASM are only used by nginx gzip_static, so drop them.
     buildCommand: npm ci && npm run build && rm -f out/libreoffice-wasm/*.gz
